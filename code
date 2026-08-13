@@ -1,0 +1,299 @@
+#include <FastLED.h>
+#include <SoftwareSerial.h>
+#include <DFRobotDFPlayerMini.h>
+
+#define LED_PIN 6
+#define NUM_LEDS 160
+
+#define BLUE_BUTTON 2
+#define ORANGE_BUTTON 3
+#define FIRE_BUTTON 4
+
+#define BARREL_END 55
+#define HEART_START 0
+#define HEART_END 35
+
+#define BARREL_START 36
+#define BARREL_REAL_END 130
+
+#define MUZZLE_START 131
+#define MUZZLE_END 159
+
+CRGB leds[NUM_LEDS];
+
+SoftwareSerial mySerial(10, 11);
+DFRobotDFPlayerMini player;
+
+unsigned long lockUntil = 0;
+
+bool canFire = true;
+bool orangeMode = false;
+bool isFiring = false;
+
+bool lastOrange = HIGH;
+bool lastBlue = HIGH;
+
+bool systemReady() {
+  return millis() > lockUntil && !isFiring;
+}
+
+uint8_t baseBrightness = 140;
+
+// ===== PURE COLORS =====
+CRGB BLUE_CORE   = CRGB(0, 80, 255);
+CRGB BLUE_HOT    = CRGB(80, 170, 255);
+
+CRGB ORANGE_CORE = CRGB(255, 80, 0);
+CRGB ORANGE_HOT  = CRGB(255, 150, 40);
+
+CRGB WHITE_HOT   = CRGB(180, 180, 180);
+
+void portalSwitchAnimation(bool toOrange);
+void fireSequence(bool orange);
+void coolDownToIdle(bool orange);
+
+inline void setPixel(int i, CRGB c) {
+  if (i >= 0 && i < NUM_LEDS) leds[i] = c;
+}
+
+void idleAnimationOnly() {
+  static float t = 0;
+  t += 0.02;
+
+  float wave = (sin(t) + 1.0) / 2.0;
+
+  for (int i = 0; i < NUM_LEDS; i++) {
+
+    leds[i] = orangeMode ? ORANGE_CORE : BLUE_CORE;
+
+    uint8_t b = 120 + wave * 60;
+    leds[i].nscale8_video(b);
+  }
+
+  FastLED.show();
+  delay(18);
+}
+
+void setup() {
+  delay(3000);
+
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+
+  FastLED.setBrightness(143);
+
+  pinMode(BLUE_BUTTON, INPUT_PULLUP);
+  pinMode(ORANGE_BUTTON, INPUT_PULLUP);
+  pinMode(FIRE_BUTTON, INPUT_PULLUP);
+
+  mySerial.begin(9600);
+
+  player.begin(mySerial, false);
+  player.volume(55);
+}
+
+void loop() {
+  if (millis() < lockUntil) {
+    idleAnimationOnly();
+    return;
+  }
+
+  // ===== MODE SWITCHING =====
+  bool orangePressed = digitalRead(ORANGE_BUTTON);
+  bool bluePressed = digitalRead(BLUE_BUTTON);
+
+  if (orangePressed == LOW && lastOrange == HIGH && !orangeMode && !isFiring) {
+    portalSwitchAnimation(true);
+    orangeMode = true;
+  }
+
+  if (bluePressed == LOW && lastBlue == HIGH && orangeMode && !isFiring) {
+    portalSwitchAnimation(false);
+    orangeMode = false;
+  }
+
+  lastOrange = orangePressed;
+  lastBlue   = bluePressed;
+
+  // ===== UNSTABLE IDLE =====
+  static float t = 0;
+  t += 0.035;
+
+  float wave = (sin(t) + 1.0) / 2.0;
+
+  int instability = random(-4, 4);
+
+  int barrelLevel = baseBrightness + (wave * 40) + instability;
+  barrelLevel = constrain(barrelLevel, 90, 255);
+
+  for (int i = 0; i < NUM_LEDS; i++) {
+    float flicker = random(95, 115) / 100.0;
+    // ===== HEART =====
+    if (i <= HEART_END) {
+
+      float heartWave = (sin(t * 0.45) + 1.0) / 2.0;
+
+      int heartBright = 70 + heartWave * 90;
+
+      leds[i] = orangeMode ?
+        CRGB(heartBright, heartBright / 4, 0) :
+        CRGB(0, heartBright / 3, heartBright);
+    }
+
+    // ===== BARREL + MUZZLE =====
+    else {
+      leds[i] = orangeMode ? ORANGE_CORE : BLUE_CORE;
+    }
+
+    uint8_t brightness = barrelLevel * flicker;
+
+    leds[i].r = leds[i].r * brightness / 255;
+    leds[i].g = leds[i].g * brightness / 255;
+    leds[i].b = leds[i].b * brightness / 255;
+  }
+
+  // ===== FRONT ARC FLICKERS =====
+  if (random(100) < (orangeMode ? 22 : 10)) {
+    int v = random(BARREL_END);
+    leds[v] = orangeMode ? ORANGE_HOT : BLUE_HOT;
+  }
+
+  FastLED.show();
+  FastLED.delay(18);
+
+  // ===== FIRE =====
+  if (digitalRead(FIRE_BUTTON) == LOW && millis() > lockUntil) {
+    fireSequence(orangeMode);
+  }
+}
+
+// =====================================================
+// ======================= FIRE ========================
+// =====================================================
+void fireSequence(bool orange) {
+  isFiring = true;
+  lockUntil = millis() + 1200; // prevents spam + freeze overlap
+  canFire  = false;
+
+  CRGB core = orange ? ORANGE_CORE : BLUE_CORE;
+  CRGB hot  = orange ? ORANGE_HOT  : BLUE_HOT;
+
+  if (orange) player.play(2);
+  else        player.play(1);
+
+  // reactor recoil
+  for (int i = HEART_START; i < HEART_END; i++) {
+    leds[i].fadeToBlackBy(120);
+  }
+
+  FastLED.show();
+  delay(20);
+
+  // buildup
+  int buildupCount = orange ? 5 : 4;
+  for (int b = 0; b < buildupCount; b++) {
+    fill_solid(leds, NUM_LEDS, core);
+
+    for (int i = 0; i < BARREL_END; i++) {
+      leds[i] = orange ? CRGB(255, 140, 40) : CRGB(30, 120, 255);
+    }
+
+    if (orange) leds[random(BARREL_END)] = CRGB(180, 180, 180);
+
+    FastLED.show();
+    delay(orange ? 8 : 10);
+
+    fill_solid(leds, NUM_LEDS, hot);
+    FastLED.show();
+    delay(orange ? 4 : 6);
+  }
+
+  int trail = orange ? 12 : 10;
+  for (int i = 0; i < NUM_LEDS + trail; i++) {
+    fill_solid(leds, NUM_LEDS, core);
+
+    setPixel(i,     CRGB(180, 180, 180));
+    setPixel(i - 1, orange ? CRGB(255, 180, 80) : CRGB(180, 220, 255));
+    setPixel(i - 2, orange ? CRGB(255, 120, 30) : CRGB(80, 180, 255));
+    setPixel(i - 3, orange ? CRGB(255, 80, 0)   : CRGB(0, 150, 255));
+
+    if (orange && random(100) < 18) {
+      int s = random(BARREL_END);
+      leds[s] += CRGB(80, 20, 0);
+    }
+
+    FastLED.show();
+    delay(1);
+  }
+
+  coolDownToIdle(orange);
+
+  // wait for release so we don't auto-repeat the shot
+  unsigned long holdStart = millis();
+  while (digitalRead(FIRE_BUTTON) == LOW) {
+    if (millis() - holdStart > 300) break; // safety escape
+    delay(5);
+  }
+
+  isFiring = false;
+  canFire  = true;
+}
+
+// Fades the bright muzzle flash down to roughly the idle glow level,
+// so when loop() resumes the idle breathing it picks up seamlessly.
+void coolDownToIdle(bool orange) {
+  CRGB core = orange ? ORANGE_CORE : BLUE_CORE;
+
+  // only fade brightness, DO NOT repaint full strip white
+  for (int b = 255; b >= baseBrightness; b -= 6) {
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = core;
+
+      // ONLY muzzle glow (NOT whole strip)
+      if (i <= MUZZLE_END) {
+        leds[i] += CRGB(40, 40, 40);
+      }
+
+      leds[i].nscale8_video(b);
+    }
+
+    FastLED.show();
+    delay(12);
+  }
+}
+
+// ===== PORTAL SWITCH =====
+void portalSwitchAnimation(bool toOrange) {
+  for (int i = 0; i < 6; i++) {
+    fadeToBlackBy(leds, NUM_LEDS, 40);
+
+    int c = BARREL_END / 2;
+
+    for (int j = -3; j <= 3; j++) {
+      setPixel(c + j, WHITE_HOT);
+    }
+
+    FastLED.show();
+    delay(15);
+  }
+
+  for (int p = 0; p < 3; p++) {
+    fill_solid(leds, NUM_LEDS, toOrange ? ORANGE_CORE : BLUE_CORE);
+    FastLED.show();
+    delay(25);
+
+    fill_solid(leds, NUM_LEDS, CRGB::Black);
+    FastLED.show();
+    delay(12);
+  }
+
+  for (int r = 0; r < 8; r++) {
+    int v = random(90, 160);
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = toOrange ? ORANGE_CORE : BLUE_CORE;
+      leds[i].nscale8_video(v);
+    }
+
+    FastLED.show();
+    delay(12);
+  }
+}
