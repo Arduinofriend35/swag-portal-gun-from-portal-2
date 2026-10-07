@@ -1,3 +1,10 @@
+
+// make sure to get these libarbies: (also i used arduino IDE for this porject)
+// DFRobotDFPlayerMini 
+// by DFRobot
+// FastLED
+// by Daniel Garcia
+
 #include <FastLED.h>
 #include <SoftwareSerial.h>
 #include <DFRobotDFPlayerMini.h>
