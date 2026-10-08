@@ -1,5 +1,5 @@
 
-// make sure to get these libarbies: (also i used arduino IDE for this porject)
+// make sure to get these libarbies: (also i used Arduino IDE for this project)
 // DFRobotDFPlayerMini 
 // by DFRobot
 // FastLED
@@ -250,7 +250,7 @@ void fireSequence(bool orange) {
 void coolDownToIdle(bool orange) {
   CRGB core = orange ? ORANGE_CORE : BLUE_CORE;
 
-  // only fade brightness, DO NOT repaint full strip white
+  // only fade brightness
   for (int b = 255; b >= baseBrightness; b -= 6) {
     for (int i = 0; i < NUM_LEDS; i++) {
       leds[i] = core;
