@@ -2,7 +2,10 @@ swag-portal-gun-from-portal-2
 It's swagger, and it's from the game with full electronics, lights, and sound!
 I started this project for myself, but now I want to add it to HackClub after I heard about the club at FRC Worlds when I went with my team
 the 3d printer i used is a ender 3 v2 .4 nozzle all parts were printed in PLA
-This is my first electronics project, so I was learning a lot along the way, like soldering, wiring diagram designing, and programming. Honestly, I have been having so much fun with the project, andit'ss been a dream of mine to have a portal gun, but all the ones I wanted to buy were really expensive, so I decided to build my own<img width="3024" height="4032" alt="image" src="https://github.com/user-attachments/assets/6c3046dd-da2c-49bf-bfca-600b97838662" />
+This is my first electronics project, so I was learning a lot along the way, like soldering, wiring diagram design, and programming. Honestly, I have been having so much fun with the project, andit'ss been a dream of mine to have a portal gun, but all the ones I wanted to buy were really expensive, so I decided to build my own I WOULD RECOMMEND USING THE CAD I MADE TO HOUSE THE ELECTRONICS WITH THE RUBBER BANDS THE FILES ARE NAMED: 
+back black electronics holder hollowed with nubs 
+AND: FRONT black electronics holder hollowed with nubs
+<img width="3024" height="4032" alt="image" src="https://github.com/user-attachments/assets/6c3046dd-da2c-49bf-bfca-600b97838662" />
 
 <img width="1206" height="2120" alt="image" src="https://github.com/user-attachments/assets/fb170431-14c0-490b-8682-80cf92b07b64" />
 
